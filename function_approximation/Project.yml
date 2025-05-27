@@ -1,0 +1,20 @@
+name: bilevel
+channels:
+  - defaults
+  - nvidia
+  - conda-forge
+  - pytorch
+dependencies:
+  - h5py
+  - hdf5
+  - matplotlib
+  - numpy
+  - python
+  - scikit-learn
+  - scipy
+  - tqdm
+  - pytorch
+  - pytorch-cuda=11.8
+  - torchvision
+  - hdf5storage
+  - cuda-toolkit=11.8
