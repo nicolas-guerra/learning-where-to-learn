@@ -5,6 +5,7 @@ This repository contains scripts and notebook to reproduce the main experimental
 ## Files
 
 * **NtDExample.py**: Python script to run multiple independent runs of the Alternating Minimization Algorithm on the NtD example and save results to `NtD_results.pkl`.
+* **NtDGPU.py**: Python script to run multiple independent runs of the Alternating Minimization Algorithm on the NtD example (using GPU if available), and save results to `NtD_results.pkl`.
 * **DarcyFlowGPU.py**: Python script to run multiple independent runs of the Alternating Minimization Algorithm on the Darcy flow forward problem (using GPU if available), and save results to `DarcyFlow_results.pkl`.
 * **PlotResults.ipynb**: Jupyter notebook that loads `NtD_results.pkl` and `DarcyFlow_results.pkl`, generates the figures presented in the paper, and saves or displays them.
 
