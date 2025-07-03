@@ -1,4 +1,4 @@
-# Code for the paper "Learning Where to Learn: Training Distribution Selection for Provable OOD Performance"
+# Code for the paper [**Learning Where to Learn: Training Distribution Selection for Provable OOD Performance**](https://arxiv.org/abs/2505.21626)
 
 This repository contains code to reproduce experiments from the paper. It includes:
 
@@ -99,5 +99,6 @@ pip install -r operator_learning/requirements.txt
 - Hyperparameters (e.g., sample sizes, training iterations) can be modified within each script.
 - Ensure all required dependencies are installed before executing code.
 - For plotting, a LaTeX distribution may be required.
+- The Github for the AMINO architecture used in Figure 1 of [our paper](https://arxiv.org/pdf/2505.21626) can be found [here](https://github.com/nicolas-guerra/amino).
 
 ---
