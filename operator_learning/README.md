@@ -5,6 +5,7 @@ This repository contains scripts and notebook to reproduce the main experimental
 ## Files
 
 * **NtDExample.py**: Python script to run multiple independent runs of the Alternating Minimization Algorithm on the NtD example and save results to `NtD_results.pkl`.
+* **NtDGPU.py**: Python script to run multiple independent runs of the Alternating Minimization Algorithm on the NtD example (using GPU if available), and save results to `NtD_results.pkl`.
 * **DarcyFlowGPU.py**: Python script to run multiple independent runs of the Alternating Minimization Algorithm on the Darcy flow forward problem (using GPU if available), and save results to `DarcyFlow_results.pkl`.
 * **PlotResults.ipynb**: Jupyter notebook that loads `NtD_results.pkl` and `DarcyFlow_results.pkl`, generates the figures presented in the paper, and saves or displays them.
 
@@ -39,8 +40,16 @@ Additional dependencies:
    ```
 
    * Outputs: `NtD_results.pkl` containing model performance metrics and intermediate data.
+   
+2. **NtD GPU**
 
-2. **Darcy flow example**
+   ```bash
+   python NtDGPU.py
+   ```
+
+   * Outputs: `NtD_results.pkl` containing model performance metrics and intermediate data.
+
+3. **Darcy flow example**
 
    ```bash
    python DarcyFlowGPU.py
@@ -48,7 +57,7 @@ Additional dependencies:
 
    * Outputs: `DarcyFlow_results.pkl` containing model performance metrics and intermediate data.
 
-3. **Plotting results**
+4. **Plotting results**
 
    ```bash
    jupyter notebook PlotResults.ipynb
@@ -62,9 +71,10 @@ Additional dependencies:
 ```
 ./
 ├── NtDExample.py         # Script for NtD example
+├── NtDGPU.py             # Script for NtD example with GPU
 ├── DarcyFlowGPU.py       # Script for Darcy flow example
 ├── PlotResults.ipynb     # Notebook for plotting saved results
-├── NtD_results.pkl       # Output from NtDExample.py
+├── NtD_results.pkl       # Output from NtDExample.py/NtDGPU.py
 └── DarcyFlow_results.pkl # Output from DarcyFlowGPU.py
 ```
 
