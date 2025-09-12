@@ -22,6 +22,7 @@ conda deactivate
 Additional dependencies:
 
 * a latex distribution (for plotting)
+* Requires Python 3.11+
 
 ## Usage
 
