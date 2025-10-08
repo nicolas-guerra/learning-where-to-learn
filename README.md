@@ -1,11 +1,11 @@
-# Code for the paper [**Learning Where to Learn: Training Distribution Selection for Provable OOD Performance**](https://arxiv.org/abs/2505.21626)
+# Code for the paper [**Learning Where to Learn: Training Data Distribution Optimization for Scientific Machine Learning**](https://arxiv.org/abs/2505.21626)
 
 This repository contains code to reproduce experiments from the paper. It includes:
 
 - **Bilevel kernel-based function approximation experiments**
 - **Dirichlet-to-Neumann (NtD) and Darcy flow examples**
 
-Both folders are organized independently, but share a unified objective of exploring optimal training distributions for out-of-distribution (OOD) generalization.
+Both folders are organized independently, but share a unified objective of exploring optimal training distributions for out-of-distribution (OOD) accuracy.
 
 ---
 
@@ -64,7 +64,7 @@ pip install -r operator_learning/requirements.txt
 2. **Plot results**:
 
    ```bash
-   python plot.py
+   python plot_compare.py
    ```
 
 ---
