@@ -1,6 +1,3 @@
-"""
-Adapted from pyapprox repo: https://github.com/sandialabs/pyapprox/blob/master/pyapprox/util/configure_plots.py
-"""
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 mystyle = {

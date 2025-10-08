@@ -13,9 +13,6 @@ def sobol_func(x):
     x = torch.prod(x, dim=-1)
     return x
 
-def ishigimi_func(x):
-    return (1 + 0.1*x[..., 2]**4)*torch.sin(x[..., 0]) + 7*torch.sin(x[..., 1])**2
-
 def friedmann1_func(x):
     out = 10*torch.sin(torch.pi*x[..., 0]*x[..., 1])
     out += 20*(x[..., 2] - 0.5)**2 + 10*x[..., 3] + 5*x[..., 4]
@@ -30,4 +27,43 @@ def friedmann2_func(x):
     out = (100*x[..., 0])**2 + out**2
 
     return torch.sqrt(out)
-    
+
+class rkhs_func(object):
+    def __init__(self,
+                 d,
+                 J=1000,
+                 crange=4,
+                 brange=1,
+                 sigma=0.25,
+                 kernel=gaussian_kernel
+                 ):
+        super().__init__()
+        
+        self.d = d
+        self.J = J
+        self.crange = crange
+        self.brange = brange
+        self.sigma = sigma
+        self.kernel_name = kernel
+        
+        # Setup
+        self.kernel = lambda x,y: self.kernel_name(x, y, self.sigma)
+        self.coeff = None
+        self.centers = None
+        self.set_params()
+        
+    def set_params(self):
+        self.coeff = 2*self.brange*torch.rand(self.J) - self.brange # Unif(-brange,brange)
+        self.centers = 2*self.crange*torch.rand(self.J, self.d) - self.crange # Unif(-crange,crange)
+
+    def forward(self, x):
+        """
+        x: (nbatch, d) tensor, where d is the input dimension.
+        Returns (nbatch,) tensor of scalar predictions.
+        """
+        dev = x.device
+        x = self.kernel(x, self.centers.to(dev))
+        return torch.einsum('ij,j->i', x, self.coeff.to(dev))
+        
+    def __call__(self, x):
+        return self.forward(x)

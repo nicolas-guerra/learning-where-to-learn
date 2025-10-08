@@ -1,6 +1,6 @@
-# Supplementary Code for the Paper: "Learning Where to Learn: Training Distribution Selection for Provable OOD Performance"
+# Supplementary Code for the Paper: "Learning Where to Learn: Training Data Distribution Optimization for Scientific Machine Learning"
 
-This repository contains scripts to reproduce the main experimental results for the bilevel minimization kernel-based function approximation experiments. The code defaults to running on GPU, if one is available. 
+This repository contains scripts to reproduce the main experimental results for the bilevel minimization kernel-based function approximation experiments. The code defaults to running on GPU, if one is available.
 
 ## Installation and Requirements
 
@@ -22,7 +22,6 @@ conda deactivate
 Additional dependencies:
 
 * a latex distribution (for plotting)
-* Requires Python 3.11+
 
 ## Usage
 
@@ -39,7 +38,7 @@ Users may edit config files for each function they wish to approximate, which th
 2. **Plotting results**
 
    ```bash
-   python plot.py
+   python plot_compare.py
    ```
 
 ## Notes & Recommendations
