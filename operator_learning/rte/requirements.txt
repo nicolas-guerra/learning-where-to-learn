@@ -1,0 +1,13 @@
+# requirements.txt
+# PyTorch (pick proper CUDA build per your system; plain "torch" may install a CPU or default wheel)
+torch
+cupy
+# or cupy-cuda11x (match your CUDA version)
+deepxde
+pykeops
+pot      
+numpy
+pandas
+scipy
+matplotlib
+tqdm
