@@ -56,13 +56,16 @@ Three Jupyter notebooks are provided for analyzing results:
 3. RTEInputOutput.ipynb
    - Given scattering coefficient, visualizes spatial-domain density 
 
+4. QuickAnalysis.ipynb
+   - Computes error statistics and running time
+
 TYPICAL WORKFLOW
 ----------------
 1. Set up environment using the requirements.txt file
 2. Run experiments for desired ep_index and N combinations using run_all.sh
 3. Use PlotResults.ipynb to analyze OOD error performance
 4. Use PlotTime.ipynb to analyze computational efficiency
-5. Makes directories contain all raw data for further analysis
+5. Use QuickAnalysis.ipynb to output error statistics and runtime
 
 
 REQUIREMENTS
