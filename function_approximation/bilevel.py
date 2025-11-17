@@ -1,6 +1,7 @@
 import torch
 from util.utilities_module import vec_to_cholesky, process_cholesky, solve_with_cholesky, sqrtmh
 from kernels import gaussian_kernel
+from quadrature import rpcholesky
 
 
 class Model(object):
@@ -299,6 +300,26 @@ class UniformDistribution(object):
     def __call__(self, *args,  **kwargs):
         return self.sample(*args, **kwargs)
     
+class RPCholeskyDistribution(object):
+    """
+    RPCholesky
+    """
+    def __init__(self,
+                 kernel,
+                 proposal,
+                 device=None
+                 ):
+        super().__init__()
+
+        self.kernel = kernel
+        self.proposal = proposal
+        self.device = device
+    
+    def sample(self, n=1):
+        return rpcholesky(self.proposal, n, self.kernel)
+        
+    def __call__(self, *args,  **kwargs):
+        return self.sample(*args, **kwargs)
 
 class CallableDistribution(object):
     """

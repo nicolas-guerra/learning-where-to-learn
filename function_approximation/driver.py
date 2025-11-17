@@ -196,6 +196,8 @@ design_gmm = FiniteMixture(mu_emp_list, device=device)
 
 design_bary = GaussianBarycenter(means_emp, covs_emp, device=device)
 
+proposal = lambda: np.random.rand(1)
+design_rpc = RPCholeskyDistribution(kernel, proposal=proposal, device=device)
 
 # Save covs
 cov_seq = design_seq.distribution.covariance_matrix.cpu().numpy()
@@ -216,6 +218,7 @@ errors_seq_loops = []
 errors_unif_loops = []
 errors_gmm_loops = []
 errors_bary_loops = []
+errors_rpc_loops = []
 for _ in tqdm(range(num_loops)):
 
     # Initial
@@ -238,15 +241,21 @@ for _ in tqdm(range(num_loops)):
     print("Barycenter")
     errors_bary_loops.append(loop_krr(design_bary, sample_size_list))
 
+    # RPCholesky
+    print("RPCholesky")
+    errors_rpc_loops.append(loop_krr(design_rpc, sample_size_list))
+
 # Save MC loops
 errors_static_loops = torch.stack(errors_static_loops)
 errors_seq_loops = torch.stack(errors_seq_loops)
 errors_unif_loops = torch.stack(errors_unif_loops)
 errors_gmm_loops = torch.stack(errors_gmm_loops)
 errors_bary_loops = torch.stack(errors_bary_loops)
+errors_rpc_loops = torch.stack(errors_rpc_loops)
 
 np.save(plot_folder + "errors_static_loops", errors_static_loops.cpu().numpy())
 np.save(plot_folder + "errors_seq_loops", errors_seq_loops.cpu().numpy())
 np.save(plot_folder + "errors_unif_loops", errors_unif_loops.cpu().numpy())
 np.save(plot_folder + "errors_gmm_loops", errors_gmm_loops.cpu().numpy())
 np.save(plot_folder + "errors_bary_loops", errors_bary_loops.cpu().numpy())
+np.save(plot_folder + "errors_rpc_loops", errors_rpc_loops.cpu().numpy())
