@@ -147,3 +147,4 @@ z_*
 *.pt
 **/figures
 **/results
+*.csv
