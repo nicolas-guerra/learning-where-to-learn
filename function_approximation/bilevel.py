@@ -350,12 +350,6 @@ class NonadaptiveCoreSet(object):
         """
         Select n new indices from the pool that are farthest (in RKHS norm induced by
         the kernel) from the currently selected points.
-
-        Args:
-            n: number of new indices to add.
-
-        Returns:
-            Tensor of selected indices
         """
         # If nothing is selected yet, just pick random points
         if self.selected.numel() == 0:
