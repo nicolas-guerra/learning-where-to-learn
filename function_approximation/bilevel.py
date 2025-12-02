@@ -362,8 +362,11 @@ class NonadaptiveCoreSet(object):
         # Compute kernel evaluations
         X = self.pool.to(self.device)
 
-        # diagonal k(x_i,x_i)
-        Kdiag = torch.diagonal(self.kernel(X, X))
+        # diagonal k(x_i,x_i), assumes kernel function of (x-y) only
+        Kdiag = torch.ones((1, X.shape[-1]), device=self.device)
+        Kdiag = self.kernel(Kdiag,Kdiag)
+        Kdiag = Kdiag.squeeze() * torch.ones(self.Npool, device=self.device)
+        # Kdiag = torch.diagonal(self.kernel(X, X))
 
         # kernel between all pool points and currently selected points: shape (N, S)
         K_sel = self.kernel(X, X[self.selected])
