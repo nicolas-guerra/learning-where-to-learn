@@ -171,6 +171,32 @@ def loop_krr(design, sample_size_list, eps=eps_initial, device=device, truth=tru
     return torch.tensor(errors)
 
 
+# coreset loop
+def loop_coreset(my_core, sample_size_list, eps=eps_initial, device=device, truth=truth, data_test=data_test, data_test_test=data_test_test, kernel=kernel, meta_loss=meta_loss):
+    """
+    Fix a training distribution, and loop through training sample sizes
+    """
+    eps_init = eps
+    errors = []
+    Npool = my_core.Npool
+    sample_size_list = sample_size_list[sample_size_list < Npool]
+    
+    for N in sample_size_list:
+        # Build model
+        eps = eps_init / N      # Scale regularization with N in Bayesian way
+        try:
+            model = model_update(N, design, truth, eps, data_test, kernel, device, split_data=False)
+        except:
+            model = model_update(N, design, truth, eps, data_test, kernel, device="cpu", split_data=False)
+
+        # Log
+        loss = meta_loss(model, data_test_test, device=device)
+        errors.append(loss)
+        print(f'Sample Size [{N}/{sample_size_list[-1]}], MetaLoss (unseen): {loss}')
+        
+    return torch.tensor(errors)
+
+
 # Build comparison distributions
 mu_emp_list = []
 means_emp = torch.zeros(J,d)
@@ -196,8 +222,6 @@ design_gmm = FiniteMixture(mu_emp_list, device=device)
 
 design_bary = GaussianBarycenter(means_emp, covs_emp, device=device)
 
-proposal = lambda: np.random.rand(1)
-design_rpc = RPCholeskyDistribution(kernel, proposal=proposal, device=device)
 
 # Save covs
 cov_seq = design_seq.distribution.covariance_matrix.cpu().numpy()
@@ -218,7 +242,7 @@ errors_seq_loops = []
 errors_unif_loops = []
 errors_gmm_loops = []
 errors_bary_loops = []
-errors_rpc_loops = []
+errors_ncore_loops = []
 for _ in tqdm(range(num_loops)):
 
     # Initial
@@ -243,7 +267,7 @@ for _ in tqdm(range(num_loops)):
 
     # RPCholesky
     print("RPCholesky")
-    errors_rpc_loops.append(loop_krr(design_rpc, sample_size_list))
+    errors_ncore_loops.append(loop_krr(design_ncore, sample_size_list))
 
 # Save MC loops
 errors_static_loops = torch.stack(errors_static_loops)
@@ -251,11 +275,11 @@ errors_seq_loops = torch.stack(errors_seq_loops)
 errors_unif_loops = torch.stack(errors_unif_loops)
 errors_gmm_loops = torch.stack(errors_gmm_loops)
 errors_bary_loops = torch.stack(errors_bary_loops)
-errors_rpc_loops = torch.stack(errors_rpc_loops)
+errors_ncore_loops = torch.stack(errors_ncore_loops)
 
 np.save(plot_folder + "errors_static_loops", errors_static_loops.cpu().numpy())
 np.save(plot_folder + "errors_seq_loops", errors_seq_loops.cpu().numpy())
 np.save(plot_folder + "errors_unif_loops", errors_unif_loops.cpu().numpy())
 np.save(plot_folder + "errors_gmm_loops", errors_gmm_loops.cpu().numpy())
 np.save(plot_folder + "errors_bary_loops", errors_bary_loops.cpu().numpy())
-np.save(plot_folder + "errors_rpc_loops", errors_rpc_loops.cpu().numpy())
+np.save(plot_folder + "errors_ncore_loops", errors_ncore_loops.cpu().numpy())

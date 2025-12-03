@@ -307,7 +307,7 @@ class NonadaptiveCoreSet(object):
     def __init__(self,
                  kernel,
                  pool,
-                 init_select=5,
+                 init_select=1,
                  device=None
                 ):
         super().__init__()
@@ -345,7 +345,7 @@ class NonadaptiveCoreSet(object):
         Kdiag = torch.ones((1, X.shape[-1]), device=self.device)
         Kdiag = self.kernel(Kdiag,Kdiag)
         Kdiag = Kdiag.squeeze() * torch.ones(self.Npool, device=self.device)
-        # Kdiag = torch.diagonal(self.kernel(X, X))
+        # Kdiag = torch.diagonal(self.kernel(X, X)) # inefficient, do not use
 
         # kernel between all pool points and currently selected points: shape (N, S)
         K_sel = self.kernel(X, X[self.selected])
@@ -391,6 +391,10 @@ class NonadaptiveCoreSet(object):
 
         self.selected = updated.to(self.device)
         return self.selected
+    
+    def get_points(self):
+        return self.pool[self.selected.to(self.pool.device),...].to(self.device)
+    
     
 class AdaptiveCoreSet(object):
     def __init__(self,
@@ -653,3 +657,15 @@ def model_update(N, design, truth, eps, data_test, kernel, device, return_data=F
         model = (model, X_val, Y_val)
     
     return model
+
+
+if __name__=='__main__':
+    device = torch.device("cuda")
+    kernel = gaussian_kernel
+    pool = torch.randn((10000,2))
+    design_ncore = NonadaptiveCoreSet(kernel, pool, device=device)
+    
+    for _ in range(1000-1):
+        _ = design_ncore.select()
+    
+    xs = design_ncore.get_points()
