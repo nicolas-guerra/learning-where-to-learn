@@ -1,7 +1,6 @@
 import torch
 from util.utilities_module import vec_to_cholesky, process_cholesky, solve_with_cholesky, sqrtmh
 from kernels import gaussian_kernel
-from quadrature import rpcholesky
 
 
 class Model(object):
@@ -300,26 +299,172 @@ class UniformDistribution(object):
     def __call__(self, *args,  **kwargs):
         return self.sample(*args, **kwargs)
     
-class RPCholeskyDistribution(object):
+    
+class NonadaptiveCoreSet(object):
     """
-    RPCholesky
+    Non-adaptive core-set selection
     """
     def __init__(self,
                  kernel,
-                 proposal,
+                 pool,
+                 init_select=1,
                  device=None
-                 ):
+                ):
         super().__init__()
-
         self.kernel = kernel
-        self.proposal = proposal
+        self.pool = pool # PyTorch tensor of shape (Npool, d)
+        self.init_select = init_select
+        # selected will store indices of points selected from the pool
+        self.Npool = self.pool.shape[0]
+        if self.init_select is None or self.init_select <= 0:
+            self.selected = torch.empty(0, dtype=torch.long, device=device)
+        else:
+            # random without replacement
+            perm = torch.randperm(self.Npool, device=device)
+            k = min(self.init_select, self.Npool)
+            self.selected = perm[:k].to(device)
+        self.device = device
+
+    def select(self, n=1):
+        """
+        Select n new indices from the pool that are farthest (in RKHS norm induced by
+        the kernel) from the currently selected points.
+        """
+        # If nothing is selected yet, just pick random points
+        if self.selected.numel() == 0:
+            perm = torch.randperm(self.Npool, device=self.device)
+            k = min(n, self.Npool)
+            new_sel = perm[:k]
+            self.selected = new_sel.to(self.device)
+            return self.selected
+
+        # Compute kernel evaluations
+        X = self.pool.to(self.device)
+
+        # diagonal k(x_i,x_i), assumes kernel function of (x-y) only
+        Kdiag = torch.ones((1, X.shape[-1]), device=self.device)
+        Kdiag = self.kernel(Kdiag,Kdiag)
+        Kdiag = Kdiag.squeeze() * torch.ones(self.Npool, device=self.device)
+        # Kdiag = torch.diagonal(self.kernel(X, X)) # inefficient, do not use
+
+        # kernel between all pool points and currently selected points: shape (N, S)
+        K_sel = self.kernel(X, X[self.selected])
+
+        # diag for selected points
+        Kdiag_sel = Kdiag[self.selected]
+
+        # squared RKHS distances between each pool point i and each selected j:
+        # d^2(i,j) = k(x_i,x_i) - 2 k(x_i,x_j) + k(x_j,x_j)
+        # shape (N, S)
+        d2 = Kdiag.unsqueeze(1) - 2.0 * K_sel + Kdiag_sel.unsqueeze(0)
+
+        # numerical issues may create tiny negative values -> clamp
+        d2 = torch.clamp(d2, min=0.0)
+
+        # distance to nearest selected point for each pool point
+        nearest_d2, _ = torch.min(d2, dim=1)
+
+        # Exclude already selected indices from candidates by setting their score very low
+        mask = torch.zeros(self.Npool, device=self.device, dtype=torch.bool)
+        mask[self.selected] = True
+        nearest_d2[mask] = -float('inf')
+
+        # Number of candidates remaining
+        remaining = (~mask).sum().item()
+        if remaining <= 0:
+            # nothing to add
+            return self.selected
+
+        k = min(n, remaining)
+        # pick top-k farthest (largest nearest_d2)
+        topk = torch.topk(nearest_d2, k=k)
+        new_indices = topk.indices
+
+        # May not be needed, but to be safe:
+        # concatenate and keep unique, preserving order: selected then new
+        updated = torch.cat((self.selected.to(self.device), new_indices.to(self.device)))
+        # make unique while preserving order
+        _, inv = torch.unique_consecutive(updated, return_inverse=True)
+        # unique_consecutive preserves consecutive duplicates only; to ensure uniqueness
+        # we fallback to unique() which does not guarantee order, but here order is not critical
+        updated = torch.unique(updated)
+
+        self.selected = updated.to(self.device)
+        return self.selected
+    
+    def get_points(self):
+        return self.pool[self.selected.to(self.pool.device),...].to(self.device)
+    
+    
+class AdaptiveCoreSet(object):
+    def __init__(self,
+                 kernel,
+                 pool,
+                 init_select=5,
+                 device=None
+                ):
+        super().__init__()
+        self.kernel = kernel
+        self.pool = pool
+        self.init_select = init_select
+        # selected will store indices of points selected from the pool
+        self.Npool = self.pool.shape[0]
+        if self.init_select is None or self.init_select <= 0:
+            self.selected = torch.empty(0, dtype=torch.long, device=device)
+        else:
+            # random without replacement
+            perm = torch.randperm(self.Npool, device=device)
+            k = min(self.init_select, self.Npool)
+            self.selected = perm[:k].to(device)
         self.device = device
     
-    def sample(self, n=1):
-        return rpcholesky(self.proposal, n, self.kernel)
-        
-    def __call__(self, *args,  **kwargs):
-        return self.sample(*args, **kwargs)
+    def select(self, model, n=1):
+        """
+        Select n new indices from the pool using model-derived features
+        f_i = { c_n * k(x_i, z_n) } where c = model.coeff and z = model.X_train.
+        Picks points whose feature vector is farthest from the nearest currently selected feature.
+        """
+        # If no selected points, pick random ones
+        if self.selected.numel() == 0:
+            perm = torch.randperm(self.Npool, device=self.device)
+            k = min(n, self.Npool)
+            new_sel = perm[:k]
+            self.selected = new_sel.to(self.device)
+            return self.selected
+
+        # Build feature matrix F (Npool x Ntrain)
+        Xpool = self.pool.to(self.device)
+        Xtrain = model.X_train.to(self.device)
+        coeff = model.coeff.to(self.device)
+        K_pool_train = self.kernel(Xpool, Xtrain)  # (Npool, Ntrain)
+        F = K_pool_train * coeff.unsqueeze(0)      # (Npool, Ntrain)
+
+        # Compute squared distances to selected features
+        F_sel = F[self.selected]                    # (S, Ntrain)
+        row_norm2 = torch.sum(F * F, dim=1)        # (Npool,)
+        row_sel_norm2 = torch.sum(F_sel * F_sel, dim=1)  # (S,)
+        cross = F @ F_sel.t()                       # (Npool, S)
+        d2 = row_norm2.unsqueeze(1) + row_sel_norm2.unsqueeze(0) - 2.0 * cross
+        d2 = torch.clamp(d2, min=0.0)
+
+        nearest_d2, _ = torch.min(d2, dim=1)
+
+        # Exclude already selected indices
+        mask = torch.zeros(self.Npool, device=self.device, dtype=torch.bool)
+        mask[self.selected] = True
+        nearest_d2[mask] = -float('inf')
+
+        remaining = (~mask).sum().item()
+        if remaining <= 0:
+            return self.selected
+
+        k = min(n, remaining)
+        new_indices = torch.topk(nearest_d2, k=k).indices
+
+        updated = torch.cat((self.selected.to(self.device), new_indices.to(self.device)))
+        updated = torch.unique(updated)
+        self.selected = updated.to(self.device)
+        return self.selected
 
 class CallableDistribution(object):
     """
@@ -512,3 +657,15 @@ def model_update(N, design, truth, eps, data_test, kernel, device, return_data=F
         model = (model, X_val, Y_val)
     
     return model
+
+
+if __name__=='__main__':
+    device = torch.device("cuda")
+    kernel = gaussian_kernel
+    pool = torch.randn((10000,2))
+    design_ncore = NonadaptiveCoreSet(kernel, pool, device=device)
+    
+    for _ in range(1000-1):
+        _ = design_ncore.select()
+    
+    xs = design_ncore.get_points()
