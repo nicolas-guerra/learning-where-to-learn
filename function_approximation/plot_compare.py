@@ -8,7 +8,7 @@ plt.close("all")
 plt.rcParams['figure.dpi'] = 250
 plt.rcParams['savefig.dpi'] = 250
 plt.rcParams['font.size'] = 18
-plt.rc('legend', fontsize=13)
+plt.rc('legend', fontsize=12)
 plt.rcParams['lines.linewidth'] = 3.5
 msz = 14
 handlelength = 3.0     # 2.75
@@ -37,7 +37,7 @@ linestyle_tuples = {
 
 marker_list = ['o', 'd', 's', 'v', 'X', "*", "P", "^"]
 style_list = ['-.', linestyle_tuples['dotted'], linestyle_tuples['densely dashdotted'],
-              linestyle_tuples['densely dashed'], linestyle_tuples['densely dashdotdotted'], linestyle_tuples['densely dashdotdotted']]
+              linestyle_tuples['densely dashed'], linestyle_tuples['densely dashdotdotted'], linestyle_tuples['densely dashdotdotted'], '-']
 
 
 
@@ -63,6 +63,9 @@ errors_bary_loops = np.load(plot_folder + "errors_bary_loops.npy")
 errors_gmm_loops = np.load(plot_folder + "errors_gmm_loops.npy")
 errors_unif_loops = np.load(plot_folder + "errors_unif_loops.npy")
 errors_ncore_loops = np.load(plot_folder + "errors_ncore_loops.npy")
+errors_acore_loops = np.load(plot_folder + "errors_acore_loops.npy")
+N_acore = np.load(plot_folder + "N_acore.npy")
+
 
 def get_stats(ar):
     out = np.zeros((*ar.shape[-(ar.ndim - 1):], 2))
@@ -77,11 +80,12 @@ errors_bary = get_stats(errors_bary_loops)
 errors_gmm = get_stats(errors_gmm_loops)
 errors_unif = get_stats(errors_unif_loops)
 errors_ncore = get_stats(errors_ncore_loops)
+errors_acore = get_stats(errors_acore_loops)
 
 
 # Legend
 if not ONE_TEST:
-    legs = [r"Optimized", r"Normal", r"Barycenter", r"Mixture", r"Uniform", r"nCoreSet"]
+    legs = [r"Optimized", r"Normal", r"Barycenter", r"Mixture", r"Uniform", r"nCoreSet", r"aCoreSet"]
 else:
     legs = [r"Optimized", r"Normal", r"Test", r"Uniform"]
 
@@ -122,7 +126,7 @@ plt.show()
 plt.figure(1)
 
 if not ONE_TEST:
-    plot2_tup = [errors_seq, errors_static, errors_bary, errors_gmm, errors_unif, errors_ncore]
+    plot2_tup = [errors_seq, errors_static, errors_bary, errors_gmm, errors_unif, errors_ncore, errors_acore]
 else:
     plot2_tup = [errors_seq, errors_static, errors_gmm, errors_unif]
     
@@ -133,6 +137,8 @@ for i, error_array in enumerate(plot2_tup):
         
     slen = ub.shape[0]
     splot = sample_size_list[:slen]
+    if i == 7:
+        splot = N_acore
     
     plt.loglog(splot, error_array[...,0], ls=style_list[i], color=color_list[i], marker=marker_list[i], markersize=msz, label=legs[i])
     plt.fill_between(splot, lb, ub, facecolor=color_list[i], alpha=0.125)
@@ -155,9 +161,10 @@ tup3 = (sample_size_list, errors_bary)
 tup4 = (sample_size_list, errors_gmm)
 tup5 = (sample_size_list, errors_unif)
 tup6 = (sample_size_list, errors_ncore)
+tup7 = (N_acore, errors_acore)
 
 if not ONE_TEST:
-    plot3_tup = (tup1, tup2, tup3, tup4, tup5, tup6)
+    plot3_tup = (tup1, tup2, tup3, tup4, tup5, tup6, tup7)
 else:
     plot3_tup = (tup1, tup2, tup4, tup5)
 

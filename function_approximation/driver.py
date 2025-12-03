@@ -92,7 +92,7 @@ for j in range(J):
     data_test.append((V[:N_val,...], Y[:N_val,...]))
     data_test_test.append((V[N_val:,...], Y[N_val:,...]))
 
-# Gradient descent
+# Gradient descent for bilevel
 scheduler = CosineAnnealingLR(steps, lr_initial)
 reg_scheduler = CosineAnnealingLR(steps, eps_initial, eps_final)
 N_scheduler = CosineAnnealingLR(steps, N_final, N_initial)
@@ -171,7 +171,7 @@ def loop_krr(design, sample_size_list, eps=eps_initial, device=device, truth=tru
 
 
 # coreset loop
-def loop_coreset(batch, my_core, sample_size_list, eps=eps_initial, device=device, truth=truth, data_test=data_test, data_test_test=data_test_test, kernel=kernel, meta_loss=meta_loss):
+def loop_ncoreset(batch, my_core, sample_size_list, eps=eps_initial, device=device, truth=truth, data_test=data_test, data_test_test=data_test_test, kernel=kernel, meta_loss=meta_loss):
     eps_init = eps
     errors = []
     Npool = my_core.Npool
@@ -180,7 +180,7 @@ def loop_coreset(batch, my_core, sample_size_list, eps=eps_initial, device=devic
     count = 0
     for _ in range(sample_size_list[-1]//batch - my_core.init_select):
         _ = my_core.select(batch)
-        pts = design_ncore.get_points()
+        pts = my_core.get_points()
         N = pts.shape[0]
         if N >= sample_size_list[count]:
             count += 1
@@ -202,6 +202,48 @@ def loop_coreset(batch, my_core, sample_size_list, eps=eps_initial, device=devic
             break
         
     return torch.tensor(errors)
+
+def loop_acoreset(batch, my_core, sample_size_list, eps=eps_initial, device=device, truth=truth, data_test=data_test, data_test_test=data_test_test, kernel=kernel, meta_loss=meta_loss):
+    eps_init = eps
+    errors = []
+    N_actual_list = []
+    Npool = my_core.Npool
+    sample_size_list = sample_size_list[sample_size_list < Npool]
+    
+    # initialize
+    pts = my_core.get_points()
+    N = pts.shape[0]
+    eps = eps_init / N
+    model = model_update_coreset(pts, truth, eps, data_test, kernel, device, split_data=False)
+    count = 0
+    
+    # loop over batches of points
+    for _ in range((sample_size_list[-1] - my_core.init_select - 1)//batch + 1):
+        _ = my_core.select(model, n=batch)
+        pts = my_core.get_points()
+        N = pts.shape[0]
+        
+        # Build model
+        eps = eps_init / N      # Scale regularization with N in Bayesian way
+        try:
+            model = model_update_coreset(pts, truth, eps, data_test, kernel, device, split_data=False)
+        except:
+            # my_core.device = torch.device("cpu")
+            model = model_update_coreset(pts.to("cpu"), truth, eps, data_test, kernel, device="cpu", split_data=False)
+        
+        if N >= sample_size_list[count]:
+            count += 1
+
+            # Log
+            loss = meta_loss(model, data_test_test, device=device)
+            errors.append(loss)
+            N_actual_list.append(N)
+            print(f'Sample Size [{N}/{sample_size_list[-1]}], MetaLoss (unseen): {loss}')
+        
+        if count >= sample_size_list.shape[0]:
+            break
+        
+    return torch.tensor(errors), torch.tensor(N_actual_list)
 
 
 # Build comparison distributions
@@ -230,7 +272,8 @@ design_gmm = FiniteMixture(mu_emp_list, device=device)
 design_bary = GaussianBarycenter(means_emp, covs_emp, device=device)
 
 # coreset
-batch=1
+batch = 1
+batch_a = 10
 pool = [x[0] for x in data_test]
 pool = torch.cat(pool, 0)
 
@@ -255,6 +298,7 @@ errors_unif_loops = []
 errors_gmm_loops = []
 errors_bary_loops = []
 errors_ncore_loops = []
+errors_acore_loops = []
 for _ in tqdm(range(num_loops)):
 
     # Initial
@@ -280,7 +324,13 @@ for _ in tqdm(range(num_loops)):
     # Nonadaptive coreset
     print("Nonadaptive Coreset")
     design_ncore = NonadaptiveCoreSet(kernel=kernel, pool=pool, device=device)
-    errors_ncore_loops.append(loop_coreset(batch, design_ncore, sample_size_list))
+    errors_ncore_loops.append(loop_ncoreset(batch, design_ncore, sample_size_list))
+    
+    # Adaptive coreset
+    print("Adaptive Coreset")
+    design_acore = AdaptiveCoreSet(kernel=kernel, pool=pool, device=device)
+    e_temp, N_acore = loop_acoreset(batch_a, design_acore, sample_size_list)
+    errors_acore_loops.append(e_temp)
 
 # Save MC loops
 errors_static_loops = torch.stack(errors_static_loops)
@@ -289,6 +339,7 @@ errors_unif_loops = torch.stack(errors_unif_loops)
 errors_gmm_loops = torch.stack(errors_gmm_loops)
 errors_bary_loops = torch.stack(errors_bary_loops)
 errors_ncore_loops = torch.stack(errors_ncore_loops)
+errors_acore_loops = torch.stack(errors_acore_loops)
 
 np.save(plot_folder + "errors_static_loops", errors_static_loops.cpu().numpy())
 np.save(plot_folder + "errors_seq_loops", errors_seq_loops.cpu().numpy())
@@ -296,3 +347,5 @@ np.save(plot_folder + "errors_unif_loops", errors_unif_loops.cpu().numpy())
 np.save(plot_folder + "errors_gmm_loops", errors_gmm_loops.cpu().numpy())
 np.save(plot_folder + "errors_bary_loops", errors_bary_loops.cpu().numpy())
 np.save(plot_folder + "errors_ncore_loops", errors_ncore_loops.cpu().numpy())
+np.save(plot_folder + "errors_acore_loops", errors_acore_loops.cpu().numpy())
+np.save(plot_folder + "N_acore", N_acore.cpu().numpy())

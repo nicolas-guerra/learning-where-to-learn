@@ -400,7 +400,7 @@ class AdaptiveCoreSet(object):
     def __init__(self,
                  kernel,
                  pool,
-                 init_select=5,
+                 init_select=6,
                  device=None
                 ):
         super().__init__()
