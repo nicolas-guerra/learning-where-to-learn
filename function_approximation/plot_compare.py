@@ -8,7 +8,7 @@ plt.close("all")
 plt.rcParams['figure.dpi'] = 250
 plt.rcParams['savefig.dpi'] = 250
 plt.rcParams['font.size'] = 18
-plt.rc('legend', fontsize=15)
+plt.rc('legend', fontsize=13)
 plt.rcParams['lines.linewidth'] = 3.5
 msz = 14
 handlelength = 3.0     # 2.75
@@ -37,7 +37,7 @@ linestyle_tuples = {
 
 marker_list = ['o', 'd', 's', 'v', 'X', "*", "P", "^"]
 style_list = ['-.', linestyle_tuples['dotted'], linestyle_tuples['densely dashdotted'],
-              linestyle_tuples['densely dashed'], linestyle_tuples['densely dashdotdotted']]
+              linestyle_tuples['densely dashed'], linestyle_tuples['densely dashdotdotted'], linestyle_tuples['densely dashdotdotted']]
 
 
 
@@ -46,7 +46,7 @@ FLAG_save_plots = True
 FLAG_WIDE = True
 n_std = 2
 plot_tol = 1e-6
-ONE_TEST = True
+ONE_TEST = not True
 save_pref = "sobol_compare_iclr"
 
 # Derived
@@ -62,6 +62,7 @@ errors_static_loops = np.load(plot_folder + "errors_static_loops.npy")
 errors_bary_loops = np.load(plot_folder + "errors_bary_loops.npy")
 errors_gmm_loops = np.load(plot_folder + "errors_gmm_loops.npy")
 errors_unif_loops = np.load(plot_folder + "errors_unif_loops.npy")
+errors_ncore_loops = np.load(plot_folder + "errors_ncore_loops.npy")
 
 def get_stats(ar):
     out = np.zeros((*ar.shape[-(ar.ndim - 1):], 2))
@@ -75,11 +76,12 @@ errors_static = get_stats(errors_static_loops)
 errors_bary = get_stats(errors_bary_loops)
 errors_gmm = get_stats(errors_gmm_loops)
 errors_unif = get_stats(errors_unif_loops)
+errors_ncore = get_stats(errors_ncore_loops)
 
 
 # Legend
 if not ONE_TEST:
-    legs = [r"Optimized", r"Normal", r"Barycenter", r"Mixture", r"Uniform"]
+    legs = [r"Optimized", r"Normal", r"Barycenter", r"Mixture", r"Uniform", r"nCoreSet"]
 else:
     legs = [r"Optimized", r"Normal", r"Test", r"Uniform"]
 
@@ -120,7 +122,7 @@ plt.show()
 plt.figure(1)
 
 if not ONE_TEST:
-    plot2_tup = [errors_seq, errors_static, errors_bary, errors_gmm, errors_unif]
+    plot2_tup = [errors_seq, errors_static, errors_bary, errors_gmm, errors_unif, errors_ncore]
 else:
     plot2_tup = [errors_seq, errors_static, errors_gmm, errors_unif]
     
@@ -128,10 +130,12 @@ for i, error_array in enumerate(plot2_tup):
     twosigma = n_std*error_array[...,1]
     lb = np.maximum(error_array[...,0] - twosigma, plot_tol)
     ub = error_array[...,0] + twosigma
-
-    plt.loglog(sample_size_list, error_array[...,0], ls=style_list[i], color=color_list[i], marker=marker_list[i], markersize=msz, label=legs[i])
+        
+    slen = ub.shape[0]
+    splot = sample_size_list[:slen]
     
-    plt.fill_between(sample_size_list, lb, ub, facecolor=color_list[i], alpha=0.125)
+    plt.loglog(splot, error_array[...,0], ls=style_list[i], color=color_list[i], marker=marker_list[i], markersize=msz, label=legs[i])
+    plt.fill_between(splot, lb, ub, facecolor=color_list[i], alpha=0.125)
     
 plt.xlabel(r'Sample Size')
 # plt.ylabel(r'Relative OOD Error')
@@ -150,9 +154,10 @@ tup2 = (sample_size_list, errors_static)
 tup3 = (sample_size_list, errors_bary)
 tup4 = (sample_size_list, errors_gmm)
 tup5 = (sample_size_list, errors_unif)
+tup6 = (sample_size_list, errors_ncore)
 
 if not ONE_TEST:
-    plot3_tup = (tup1, tup2, tup3, tup4, tup5)
+    plot3_tup = (tup1, tup2, tup3, tup4, tup5, tup6)
 else:
     plot3_tup = (tup1, tup2, tup4, tup5)
 
@@ -161,10 +166,13 @@ for i, (xplot, error_array) in enumerate(plot3_tup):
     twosigma = n_std*error_array[...,1]
     lb = np.maximum(error_array[...,0] - twosigma, plot_tol)
     ub = error_array[...,0] + twosigma
-
-    plt.semilogy(xplot, error_array[...,0], ls=style_list[i], color=color_list[i], marker=marker_list[i], markersize=msz)
     
-    plt.fill_between(xplot, lb, ub, facecolor=color_list[i], alpha=0.125)
+    slen = ub.shape[0]
+    splot = xplot[:slen]
+
+    plt.semilogy(splot, error_array[...,0], ls=style_list[i], color=color_list[i], marker=marker_list[i], markersize=msz)
+    
+    plt.fill_between(splot, lb, ub, facecolor=color_list[i], alpha=0.125)
 
 plt.xlabel(r'Total Function Evaluations')
 plt.grid(True, which="both")
