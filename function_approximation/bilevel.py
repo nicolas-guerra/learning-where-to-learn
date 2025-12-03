@@ -436,8 +436,8 @@ class AdaptiveCoreSet(object):
         Xpool = self.pool.to(self.device)
         Xtrain = model.X_train.to(self.device)
         coeff = model.coeff.to(self.device)
-        K_pool_train = self.kernel(Xpool, Xtrain)  # (Npool, Ntrain)
-        F = K_pool_train * coeff.unsqueeze(0)      # (Npool, Ntrain)
+        F = self.kernel(Xpool, Xtrain)  # (Npool, Ntrain)
+        F = F * coeff.unsqueeze(0)      # (Npool, Ntrain)
 
         # Compute squared distances to selected features
         F_sel = F[self.selected]                    # (S, Ntrain)
@@ -465,6 +465,10 @@ class AdaptiveCoreSet(object):
         updated = torch.unique(updated)
         self.selected = updated.to(self.device)
         return self.selected
+    
+    def get_points(self):
+        return self.pool[self.selected.to(self.pool.device),...].to(self.device)
+    
 
 class CallableDistribution(object):
     """
@@ -631,6 +635,38 @@ def meta_loss(model, data_test, device=None, TAKE_ROOT=True, USE_RELATIVE=True):
 def model_update(N, design, truth, eps, data_test, kernel, device, return_data=False, N_train_percent=None, split_data=True):   
     # Sample training and validation data from current design
     X_val = design(N)
+    Y_val = truth(X_val)
+    
+    # Split dataset to avoid overfitting which slows down gradient descent
+    if split_data:
+        if N_train_percent is None:
+            N_train_percent = 66.66
+        
+        N_train = int(N_train_percent / 100 * N)
+
+        if N <= N_train:
+            raise ValueError("N must be greater than N_train")
+            
+        data_train = (X_val[:N_train, ...], Y_val[:N_train, ...])
+        X_val = X_val[N_train:, ...]
+        Y_val = Y_val[N_train:, ...]
+    else:
+        data_train = (X_val, Y_val)
+    
+    # Train model and solve adjoint for current design
+    model = Model(data_train, X_val, data_test, kernel=kernel, eps=eps, device=device)
+    model.solve_adjoint_values()
+    
+    if return_data:
+        model = (model, X_val, Y_val)
+    
+    return model
+
+
+def model_update_coreset(pts, truth, eps, data_test, kernel, device, return_data=False, N_train_percent=None, split_data=True):   
+    # Sample training and validation data from current design
+    N = pts.shape[0]
+    X_val = pts
     Y_val = truth(X_val)
     
     # Split dataset to avoid overfitting which slows down gradient descent

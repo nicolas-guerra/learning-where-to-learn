@@ -92,7 +92,6 @@ for j in range(J):
     data_test.append((V[:N_val,...], Y[:N_val,...]))
     data_test_test.append((V[N_val:,...], Y[N_val:,...]))
 
-
 # Gradient descent
 scheduler = CosineAnnealingLR(steps, lr_initial)
 reg_scheduler = CosineAnnealingLR(steps, eps_initial, eps_final)
@@ -172,27 +171,35 @@ def loop_krr(design, sample_size_list, eps=eps_initial, device=device, truth=tru
 
 
 # coreset loop
-def loop_coreset(my_core, sample_size_list, eps=eps_initial, device=device, truth=truth, data_test=data_test, data_test_test=data_test_test, kernel=kernel, meta_loss=meta_loss):
-    """
-    Fix a training distribution, and loop through training sample sizes
-    """
+def loop_coreset(batch, my_core, sample_size_list, eps=eps_initial, device=device, truth=truth, data_test=data_test, data_test_test=data_test_test, kernel=kernel, meta_loss=meta_loss):
     eps_init = eps
     errors = []
     Npool = my_core.Npool
     sample_size_list = sample_size_list[sample_size_list < Npool]
     
-    for N in sample_size_list:
-        # Build model
-        eps = eps_init / N      # Scale regularization with N in Bayesian way
-        try:
-            model = model_update(N, design, truth, eps, data_test, kernel, device, split_data=False)
-        except:
-            model = model_update(N, design, truth, eps, data_test, kernel, device="cpu", split_data=False)
+    count = 0
+    for _ in range(sample_size_list[-1]//batch - my_core.init_select):
+        _ = my_core.select(batch)
+        pts = design_ncore.get_points()
+        N = pts.shape[0]
+        if N >= sample_size_list[count]:
+            count += 1
 
-        # Log
-        loss = meta_loss(model, data_test_test, device=device)
-        errors.append(loss)
-        print(f'Sample Size [{N}/{sample_size_list[-1]}], MetaLoss (unseen): {loss}')
+            # Build model
+            eps = eps_init / N      # Scale regularization with N in Bayesian way
+            try:
+                model = model_update_coreset(pts, truth, eps, data_test, kernel, device, split_data=False)
+            except:
+                # my_core.device = torch.device("cpu")
+                model = model_update_coreset(pts.to("cpu"), truth, eps, data_test, kernel, device="cpu", split_data=False)
+    
+            # Log
+            loss = meta_loss(model, data_test_test, device=device)
+            errors.append(loss)
+            print(f'Sample Size [{N}/{sample_size_list[-1]}], MetaLoss (unseen): {loss}')
+        
+        if count >= sample_size_list.shape[0]:
+            break
         
     return torch.tensor(errors)
 
@@ -221,6 +228,11 @@ design_unif = UniformDistribution(d, device=device)
 design_gmm = FiniteMixture(mu_emp_list, device=device)
 
 design_bary = GaussianBarycenter(means_emp, covs_emp, device=device)
+
+# coreset
+batch=1
+pool = [x[0] for x in data_test]
+pool = torch.cat(pool, 0)
 
 
 # Save covs
@@ -265,9 +277,10 @@ for _ in tqdm(range(num_loops)):
     print("Barycenter")
     errors_bary_loops.append(loop_krr(design_bary, sample_size_list))
 
-    # RPCholesky
-    print("RPCholesky")
-    errors_ncore_loops.append(loop_krr(design_ncore, sample_size_list))
+    # Nonadaptive coreset
+    print("Nonadaptive Coreset")
+    design_ncore = NonadaptiveCoreSet(kernel=kernel, pool=pool, device=device)
+    errors_ncore_loops.append(loop_coreset(batch, design_ncore, sample_size_list))
 
 # Save MC loops
 errors_static_loops = torch.stack(errors_static_loops)
